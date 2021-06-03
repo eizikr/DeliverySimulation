@@ -44,5 +44,5 @@ public interface Node {
 			p.addTracking(dest, status);
 			source.deliverPackage(p);
 			dest.collectPackage(p);	
-		}
+		} 
 }

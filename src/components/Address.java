@@ -67,6 +67,7 @@ public class Address {
 	public String toString() {
 		return zip + "-" + street;
 	}
+	
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)

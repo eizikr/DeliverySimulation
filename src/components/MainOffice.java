@@ -2,18 +2,33 @@ package components;
 
 import java.util.ArrayList;
 import java.util.Random;
+
+import javax.swing.JTable;
+
+import gui.Simulator;
+
 /**
  * Manages the entire system, operates a clock, branches and vehicles, 
  * creates packages and transfers them to the appropriate branches.
- * @version 1.0, 9/4/2021
+ * @version 2.0, 8/5/2021
  * @author Itzik Rahamim - 312202351
  * @author Gil Ben Hamo - 315744557
  */
-public class MainOffice {
+public class MainOffice implements Runnable {
+	
 	private static int clock;
-	private Hub hub;
+	private static Hub hub;
 	private ArrayList<Package> packages;
 	
+	private int num_of_packs;
+	private int pack_x_cord = 100;
+	private int pack_spaces;
+	final private int FRAME_SIZE = 600;
+	final private int X_CORD = 15;
+	private int spaces,exit_spaces;
+	private boolean live = false;
+	
+	private ArrayList<Thread> allThreads;
 	/**
 	 * Constructs and initializes a MainOffice by values<br>
 	 * Example: MainOffice(6,3)
@@ -22,21 +37,36 @@ public class MainOffice {
 	 */
 	public MainOffice(int branches, int trucksForBranch)
 	{
+		int current_cord;
 		MainOffice.clock = 0;
-		this.packages = new ArrayList<Package>();
-		this.hub = new Hub();
+		spaces = (FRAME_SIZE - 30*branches)/(branches+1);
+		this.packages = new ArrayList<Package>();	// Save exit point from hub to each branch
+		MainOffice.hub = new Hub();
 		for(int i=0;i<trucksForBranch;i++)
 			hub.addTruck(new StandardTruck());
 		hub.addTruck(new NonStandardTruck());
+		
+		allThreads = new ArrayList<Thread>();
+
 		System.out.println();
+		
+		current_cord = spaces+20;	// Start index of branch
+		exit_spaces = 200 / (branches+1);
+		int end_y = MainOffice.getHub().getY_cord() + exit_spaces;
 		for(int i=0;i<branches;i++)
 		{
+			hub.getExitYPoints().add(end_y);
 			Branch newBranch = new Branch();
+			newBranch.setX_cord(X_CORD);
+			newBranch.setY_cord(current_cord);
 			for(int j=0;j<trucksForBranch;j++)
 				newBranch.addTruck(new Van());
 			hub.addBranch(newBranch);
 			System.out.println();
+			current_cord += 30+spaces;
+			end_y += exit_spaces;
 		}
+		
 	}
 	
 	/**
@@ -54,10 +84,29 @@ public class MainOffice {
 	}
 	
 	/**
+	 * Starts all the system Threads
+	 */
+	public void doStart()
+	{
+		for(Truck t : hub.getListTrucks()) 	
+			allThreads.add(new Thread(t));		
+		allThreads.add(new Thread(hub));		
+		for(Branch b : hub.getBranches())		
+		{
+			for(Truck t : b.getListTrucks()) 	
+				allThreads.add(new Thread(t));		
+			allThreads.add(new Thread(b));					
+		}
+		for(Thread t : allThreads)
+			t.start();
+	}
+	
+	/**
 	 * Prints a follow-up report for all packages in the system.
 	 */
 	public void printReport()
 	{
+		System.out.println("\n======================= STOP ========================\n");
 		for(int i=0;i<this.packages.size();i++)
 		{
 			System.out.println("TRACKING " + this.packages.get(i));
@@ -87,20 +136,13 @@ public class MainOffice {
 	 * </ul>
 	 */
 	public void tick()
-	{
-		System.out.println(this.clockString());
-		if(MainOffice.clock%5 == 0)
-			this.addPackage();
-		for(Truck t : hub.getListTrucks()) 	//work for each truck in hub
-			t.work();
-		this.hub.work();
-		for(Branch b : hub.getBranches())		//work for each branch
+	{	
+		if(!Simulator.isSuspended())
 		{
-			for(Truck t : b.getListTrucks()) 	//work for each truck
-				t.work();
-			b.work();
+			System.out.println(this.clockString());
+			if(MainOffice.clock%5 == 0 && packages.size()<num_of_packs)
+				this.addPackage();		
 		}
-		MainOffice.clock++;
 	}
 	
 	/**
@@ -109,7 +151,12 @@ public class MainOffice {
 	 */
 	public void addPackage()
 	{
+		pack_spaces = (1000 - num_of_packs*30)/(num_of_packs+1);
+		if(packages.size()==0)
+			pack_x_cord += pack_spaces;
 		Package newPack = createRandomPackage();
+		newPack.setX_cord(pack_x_cord);
+		pack_x_cord+=30+pack_spaces;
 		this.packages.add(newPack);
 		newPack.setStatus(Status.COLLECTION);
 		if(newPack instanceof NonStandardPackage)
@@ -135,7 +182,7 @@ public class MainOffice {
 	 * Get an access to the HUB
 	 * @return HUB
 	 */
-	public Hub getHub() {
+	public static Hub getHub() {
 		return hub;
 	}
 	
@@ -157,10 +204,10 @@ public class MainOffice {
 	
 	/**
 	 * Change the hub
-	 * @param hub new HUB
+	 * @param new_hub new HUB
 	 */
-	public void setHub(Hub hub) {
-		this.hub = hub;
+	public static void setHub(Hub new_hub) {
+		hub = new_hub;
 	}
 	
 	/**
@@ -227,10 +274,12 @@ public class MainOffice {
 		}
 		return newPack;
 	}
+	
 	@Override
 	public String toString() {
 		return "MainOffice [hub=" + hub + ", packages=" + packages + "]";
 	}
+	
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -239,9 +288,9 @@ public class MainOffice {
 			return false;
 		MainOffice other = (MainOffice) obj;
 		if (hub == null) {
-			if (other.hub != null)
+			if (MainOffice.hub != null)
 				return false;
-		} else if (!hub.equals(other.hub))
+		} else if (!hub.equals(MainOffice.hub))
 			return false;
 		if (packages == null) {
 			if (other.packages != null)
@@ -249,5 +298,129 @@ public class MainOffice {
 		} else if (!packages.equals(other.packages))
 			return false;
 		return true;
+	}
+	
+	/**
+	 * @return Number of packages on system
+	 */
+	public int getNum_of_packs() {
+		return num_of_packs;
+	}
+
+	/**
+	 * Sets the number of packages on the system
+	 * @param num_of_packs Number of packages
+	 */
+	public void setNum_of_packs(int num_of_packs) {
+		this.num_of_packs = num_of_packs;
+	}
+
+	@Override
+	public void run() {
+		while(live)
+		{
+			tick();
+			Simulator.getSimuPanel().repaint();
+			try {
+				Thread.sleep(500);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+			if(!Simulator.isSuspended())
+				MainOffice.clock++;	
+		}
+	}
+	
+	/**
+	 * Create all packages info table
+	 * @return AllPackagesInfo table
+	 */
+	public JTable createAllPacksTable()
+	{
+		return createTabelByArray(this.getPackages());
+	}
+	
+	/**
+	 * Create a packages list of all packages that the specific branch working with
+	 * @param id Branch id
+	 * @return Packages list of packages that the specific branch working with
+	 */
+	public ArrayList<Package> getCurrentPacksByBranch(int id)
+	{
+		ArrayList<Package> temp = new ArrayList<Package>();
+		for(Package p : this.getPackages())
+		{	// Check if package zip is the id and the package is not NonStandardPackage
+			if(p.getSenderAddress().getZip() == id && !(p instanceof NonStandardPackage))
+				temp.add(p);
+		}
+		return temp;
+	}
+	
+	/**
+	 * Create packages list of all NonStandardPackages that the hub working with
+	 * @return Packages list of NonStandardPackages that the hub working with
+	 */
+	public ArrayList<Package> getCurrentHubPacks()
+	{
+		ArrayList<Package> temp = new ArrayList<Package>();
+		for(Package p : this.getPackages())
+		{
+			if(p instanceof NonStandardPackage)
+				temp.add(p);
+		}
+		return temp;
+	}
+	
+	/**
+	 * Create JTable of packages list data
+	 * @param arr list of packages we want to show on table
+	 * @return JTable of packages
+	 */
+	public JTable createTabelByArray(ArrayList<Package> arr)
+	{
+		String [] columns = {"Package ID", "Sender", "Destination", "Prority", "Status"};
+		String[][] data = new String[arr.size()][5];
+		for(int i=0;i<arr.size();i++)
+		{
+			data[i][0] =  String.valueOf(arr.get(i).getPackageID());
+			data[i][1] =  String.valueOf(arr.get(i).getSenderAddress().getZip()+1)
+					+ "-" + String.valueOf(arr.get(i).getSenderAddress().getStreet()) ;
+			data[i][2] =  String.valueOf(arr.get(i).getDestinationAddress().getZip()+1)
+					+ "-" + String.valueOf(arr.get(i).getDestinationAddress().getStreet());
+			data[i][3] =  String.valueOf(arr.get(i).getPriority());
+			data[i][4] =  String.valueOf(arr.get(i).getStatus());
+		}
+		return new JTable(data,columns); 	
+	}
+
+	/**
+	 * @return All threads
+	 */
+	public ArrayList<Thread> getAllThreads() {
+		return allThreads;
+	}
+
+	/**
+	 * Sets all treads
+	 * @param allThreads All treads
+	 */
+	public void setAllThreads(ArrayList<Thread> allThreads) {
+		this.allThreads = allThreads;
+	}
+	
+	/**
+	 * Check if thread is alive
+	 * @return True if thread is alive
+	 */
+	public boolean isLive() {
+		return live;
+	}
+
+	/**
+	 * Sets true/false on isAlive value
+	 * @param live The thread is alive
+	 */
+	public void setLive(boolean live) {
+		this.live = live;
 	}
 }

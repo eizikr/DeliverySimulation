@@ -1,13 +1,16 @@
 package components;
+import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Random;
+
+import gui.Simulator;
 /**
  * Represents a vehicle that used for delivering packages.
- * @version 1.0, 9/4/2021
+ * @version 2.0, 8/5/2021
  * @author Itzik Rahamim - 312202351
  * @author Gil Ben Hamo - 315744557
  */
-public abstract class Truck implements Node{
+public abstract class Truck implements Runnable,Node{
 	private static int truckSerialId = 2000;	//CONSISTENTS NUMBER FOR truckSerialId
 	
 	private int truckID;
@@ -18,8 +21,9 @@ public abstract class Truck implements Node{
 	private ArrayList<Package> packages;
 	
 	//ADDITIONAL FIELDS
-	private Branch belongTo;		//reference to which branch the Truck belong to
-	
+	private Branch belongTo;		// Reference to which branch the Truck belong to
+	private double x_cord,y_cord,x_speed, y_speed;  	// Current location and speed
+	private Color truckColor;
 	/**
 	 * Constructs and initializes a Truck by default<br>
 	 * Random License plate and Model
@@ -249,5 +253,121 @@ public abstract class Truck implements Node{
 	{
 		if(!(this.packages.contains(pack)))
 			(this.packages).add(pack);
+	}
+	
+	/**
+	 * @return X Coordinate
+	 */
+	public double getX_cord() {
+		return x_cord;
+	}
+	
+	/**
+	 * @return Y Coordinate
+	 */
+	public double getY_cord() {
+		return y_cord;
+	}
+	
+	/**
+	 * @return X speed
+	 */
+	public double getX_speed() {
+		return x_speed;
+	}
+	
+	/**
+	 * @return Y speed
+	 */
+	public double getY_speed() {
+		return y_speed;
+	}
+	
+	/**
+	 * Sets new X-Coordinate
+	 * @param x_cord X-Coordinate
+	 */
+	public void setX_cord(double x_cord) {
+		this.x_cord = x_cord;
+	}
+	
+	/**
+	 * Sets new Y-Coordinate
+	 * @param y_cord Y-Coordinate
+	 */
+	public void setY_cord(double y_cord) {
+		this.y_cord = y_cord;
+	}
+	
+	/**
+	 * Sets new X-Speed
+	 * @param x_speed X-Speed
+	 */
+	public void setX_speed(double x_speed) {
+		this.x_speed = x_speed;
+	}
+	
+	/**
+	 * Sets new Y-Speed
+	 * @param y_speed Y-Speed
+	 */
+	public void setY_speed(double y_speed) {
+		this.y_speed = y_speed;
+	}
+	
+	/**
+	 * Sets trip data to hub, initialize x and y speed
+	 * @param exitPoint The exit point of hub
+	 */
+	public void setTripToHub(int exitPoint)
+	{
+		Hub h = MainOffice.getHub();
+		this.setX_speed((h.getX_cord() - this.getX_cord())/this.getTimeLeft());
+		this.setY_speed((h.getExitYPoints().get(exitPoint) -this.getY_cord())/this.getTimeLeft());
+	}
+	
+	/**
+	 * @return Truck color
+	 */
+	public Color getTruckColor() {
+		return truckColor;
+	}
+	
+	/**
+	 * Sets new truck color
+	 * @param truckColor Truck color
+	 */
+	public void setTruckColor(Color truckColor) {
+		this.truckColor = truckColor;
+	}
+	
+	/**
+	 * Lets the truck start work again
+	 */
+	public synchronized void wakeUp()
+	{
+		notify();
+	}
+	
+	@Override
+	public void run() {
+		while(true)
+		{
+			//System.out.println(this.getName());
+			while(this.getTimeLeft() == 0 || Simulator.isSuspended())
+			{
+				try {					
+					synchronized (this) {wait();}	
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			this.work();
+			try {
+				Thread.sleep(500);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}			
+		}
 	}
 }

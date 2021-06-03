@@ -1,9 +1,11 @@
 package components;
+
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.Vector;
 /**
  * Represents a sorting center
- * @version 1.0, 9/4/2021
+ * @version 2.0, 8/5/2021
  * @author Itzik Rahamim - 312202351
  * @author Gil Ben Hamo - 315744557
  * @see Branch
@@ -12,6 +14,7 @@ public class Hub extends Branch {
 	private ArrayList<Branch> branches;
 	//ADDITIONAL
 	private int deliverIndex;
+	private Vector<Integer> exitYPoints;
 	
 	/**
 	 * Constructs and initializes a Hub by default
@@ -19,15 +22,18 @@ public class Hub extends Branch {
 	public Hub()
 	{
 		super("HUB");
+		this.setWorking(true);
 		branches = new ArrayList<Branch>();
 		deliverIndex=0;
+		exitYPoints = new Vector<Integer>();
+		super.setX_cord(1140);
+		super.setY_cord(225);
 	}
-
-
 	
 	@Override
 	public String toString() {
 		return super.toString();
+		
 	}
 	@Override
 	public boolean equals(Object obj) {
@@ -79,6 +85,7 @@ public class Hub extends Branch {
 	public void setDeliverIndex(int deliverIndex) {
 		this.deliverIndex = deliverIndex;
 	}
+	
 	/**
 	 * This function performs a work unit in each beat according to the following requirements:
 	 * <ul>
@@ -106,9 +113,11 @@ public class Hub extends Branch {
 									handlePackage(p, this, t, Status.BRANCH_TRANSPORT);						
 					}
 					t.setAvailable(false);
-					t.setTimeLeft(new Random().nextInt(10)+1);
+					t.setTimeLeft((new Random().nextInt(10)+1)*10);
 					System.out.println(t.getName() + " is on it's way to " +
 							((StandardTruck)t).getDestination().getName() + ", time to arrive: " + t.getTimeLeft());
+					setTripCords(deliverIndex, t);
+					t.wakeUp();
 					deliverIndex++;
 					if(deliverIndex == this.branches.size())
 						deliverIndex = 0;
@@ -119,19 +128,21 @@ public class Hub extends Branch {
 					{
 						if(p instanceof NonStandardPackage && t.isAvailable())
 							{
-								if(p.getStatus().equals(Status.COLLECTION) &&
-										((NonStandardTruck)t).isCanFit(p))
+								if(p.getStatus().equals(Status.COLLECTION))
 								{
 									handlePackage(p, this, t, Status.COLLECTION);
 									t.setAvailable(false);
-									t.setTimeLeft(new Random().nextInt(10)+1);
+									t.setTimeLeft((new Random().nextInt(10)+1)*10);
+									setNonStandardTrip(p,t);
 									System.out.println(t.getName() + " is collecting package " + p.getPackageID() + ", time to arrive: " + t.getTimeLeft());
+									t.wakeUp();
 								}
 							}
 					}
 				}
 			}
-		}	
+		}
+		this.setWorking(false);
 	}
 	
 	@Override
@@ -143,8 +154,9 @@ public class Hub extends Branch {
 	/**
 	 * Search for the right branch according to the zip
 	 * @param zip The zip of the branch we want to find
+	 * @return Branch or null
 	 */
-	private Branch getBranchByZip(int zip)
+	public Branch getBranchByZip(int zip)
 	{
 		for(Branch b : this.getBranches())
 			if(b.getBranchId() == zip)
@@ -172,5 +184,58 @@ public class Hub extends Branch {
 		{
 			branches.add(branch);
 		}
+	}
+
+	/**
+	 * @return list of exit y points from hub
+	 */
+	public Vector<Integer> getExitYPoints() {
+		return exitYPoints;
+	}
+
+	/**
+	 * Sets new list of exit y points from hub
+	 * @param exitYPoints list of exit y points from hub
+	 */
+	public void setExitYPoints(Vector<Integer> exitYPoints) {
+		this.exitYPoints = exitYPoints;
+	}
+	
+	/**
+	 * Sets the trip coordinates from source to destination
+	 * @param exitPoint Specific Y exit point
+	 * @param t Truck
+	 */
+	private void setTripCords(int exitPoint, Truck t)
+	{
+		Branch dest = this.getBranchByZip(exitPoint);
+		t.setX_cord(this.getX_cord());
+		t.setY_cord(this.exitYPoints.get(exitPoint));
+		t.setX_speed((dest.getEnterX()- t.getX_cord())/t.getTimeLeft());
+		t.setY_speed((dest.getEnterY()-t.getY_cord())/t.getTimeLeft());
+	}
+	
+	/**
+	 * Sets NonStandardTruck trip from source to destination
+	 * @param p Package
+	 * @param t Truck
+	 */
+	public void setNonStandardTrip(Package p, Truck t)
+	{
+		t.setX_cord(this.getCenterX()-16); //-15
+		t.setY_cord(this.getY_cord());
+		t.setX_speed((p.getCenterX()-16- t.getX_cord())/t.getTimeLeft());
+		t.setY_speed((Package.getCollectY()-t.getY_cord())/t.getTimeLeft());
+	}
+	
+	/**
+	 * Checking if trucks needs to work
+	 */
+	public boolean needToWork()
+	{
+		for(Truck t:getListTrucks())
+			if(t.getTimeLeft()==0)
+				return true;
+		return false;
 	}
 }

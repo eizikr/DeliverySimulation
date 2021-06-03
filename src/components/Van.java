@@ -1,4 +1,7 @@
 package components;
+
+import java.awt.Color;
+
 /**
  * Represents a vehicle that used for delivering small packages and standard packages
  * <ul>
@@ -19,6 +22,7 @@ public class Van extends Truck{
 	public Van()
 	{
 		super();
+		super.setTruckColor(Color.BLUE);
 		System.out.println("Creating " + toString());
 	}
 	
@@ -61,6 +65,8 @@ public class Van extends Truck{
 	{
 		if(!this.isAvailable())
 		{
+			this.setX_cord(this.getX_cord()+this.getX_speed());			//move on line
+			this.setY_cord(this.getY_cord()+this.getY_speed());
 			this.setTimeLeft(this.getTimeLeft()-1);
 			if(this.getTimeLeft() == 0)
 			{

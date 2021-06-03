@@ -2,21 +2,25 @@ package components;
 import java.util.ArrayList;
 /**
  * Represents a package
- * @version 1.0, 9/4/2021
+ * @version 2.0, 8/5/2021
  * @author Itzik Rahamim - 312202351
  * @author Gil Ben Hamo - 315744557
  * @see Tracking
  */
 public abstract class Package {
 	private static int serialId = 1000; //CONSISTENTS NUMBER FOR PackageID
-	
+	private final static int START_Y = 5;
+	private final static int COLLECT_Y = 35;
+	private final static int END_Y = 600;
+
 	private int packageID;					 
 	private Priority priority;
 	private Status status;
 	private Address senderAddress;
 	private Address destinationAddress;
 	private ArrayList<Tracking> tracking;
-	
+	private int x_cord;	
+
 	/**
 	 * Constructs and initializes a package by values<br>
 	 * Example: Package(Priority.LOW, new Address(3,123456), new Address(4,123456))
@@ -201,5 +205,48 @@ public abstract class Package {
 		} else if (!tracking.equals(other.tracking))
 			return false;
 		return true;
+	}
+	
+	/**
+	 * @return Source entry Y-Coordinate
+	 */
+	public static int getStartY() {
+		return START_Y;
+	}
+
+	/**
+	 * @return Destination Y-Coordinate
+	 */
+	public static int getEndY() {
+		return END_Y;
+	}
+
+	/**
+	 * @return X-Coordinate of package
+	 */
+	public int getX_cord() {
+		return x_cord;
+	}
+
+	/**
+	 * Sets the X-Coordinate of package
+	 * @param x_cord X-Coordinate of package
+	 */
+	public void setX_cord(int x_cord) {
+		this.x_cord = x_cord;
+	}
+	
+	/**
+	 * @return Center X-Coordinate of package
+	 */
+	public int getCenterX() {
+		return x_cord+15;
+	}
+
+	/**
+	 * @return Y-Coordinate of collecting package from source
+	 */
+	public static int getCollectY() {
+		return COLLECT_Y;
 	}
 }

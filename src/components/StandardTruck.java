@@ -1,14 +1,17 @@
 package components;
 
+import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Random;
+
+import gui.Simulator;
 /**
  * Represents a vehicle that used for delivering small packages and standard packages
  * <ul>
  * <li>Transfer many packages per trip.</li>
  * <li>Collects only SmallPackage and StandardPackage.</li>
  * <li>Got a weight limit.</li></ul>
- * @version 1.0, 9/4/2021
+ * @version 2.0, 8/5/2021
  * @author Itzik Rahamim - 312202351
  * @author Gil Ben Hamo - 315744557
  * @see Truck
@@ -16,8 +19,10 @@ import java.util.Random;
 public class StandardTruck extends Truck{
 	private int maxWeight;
 	private Branch destination;
+	
 	//ADDITIONAL
 	private double loadedWeight;
+	private final Color loadedColor = new Color(0,100,0);
 	
 	 /**
 	 * Constructs and initializes a StandardTruck by default<br>
@@ -25,6 +30,7 @@ public class StandardTruck extends Truck{
 	 */
 	public StandardTruck() {
 		super();
+		super.setTruckColor(Color.GREEN);
 		this.maxWeight = new Random().nextInt(201)+100; 
 		this.destination = null;
 		this.loadedWeight = 0;
@@ -59,13 +65,17 @@ public class StandardTruck extends Truck{
 	 * <li>Trip ends when arriving at HUB</li>
 	 * </ul>
 	 */
+	//here2
 	@Override
 	public void work()
 	{
-		if(!this.isAvailable())
+		if(!this.isAvailable() /*&& !Simulator.isSuspended()*/)
 		{
+			this.setX_cord(this.getX_cord()+this.getX_speed());			//move on line
+			this.setY_cord(this.getY_cord()+this.getY_speed());
 			this.setTimeLeft(this.getTimeLeft()-1);
 			if(this.getTimeLeft() == 0)
+				
 			{	//ARRIVED
 				ArrayList<Package> temp = new ArrayList<Package>(this.getPackages());		//copy to prevent errors in loop
 				System.out.println(this.getName() + " has arrived to " + this.destination.getName());
@@ -76,24 +86,33 @@ public class StandardTruck extends Truck{
 						handlePackage(p,this,this.destination,Status.HUB_STORAGE);
 					this.setAvailable(true);
 					System.out.println(this.getName() + " unloaded packes at " + this.destination.getName());
+					hubCallBack();
 				}
-				else 									
+				else 								
 				{	//DESTINATION IS BRANCH
 					//Deliver packages to the branch
 					temp = new ArrayList<Package>(this.getPackages());//CLONE
-					for(Package p : temp)
-						handlePackage(p,this,this.destination,Status.DELIVERY);	
-					System.out.println(this.getName() + " unloaded packes at " + this.destination.getName());
+					synchronized(destination)
+					{
+						for(Package p : temp)
+							handlePackage(p,this,this.destination,Status.DELIVERY);	
+						System.out.println(this.getName() + " unloaded packes at " + this.destination.getName());						
+					}
 					
 					//Collect packages to transfer to HUB
-					temp = new ArrayList<Package>(destination.getListPackages());					//clone
+					temp = new ArrayList<Package>(destination.getListPackages());//CLONE
+					synchronized(destination)
+					{
 					for(Package p : temp)
 						if(p.getStatus().equals(Status.BRANCH_STORAGE) && this.isCanFit(p))
 							handlePackage(p,this.destination,this,Status.HUB_TRANSPORT);
+					}
 					//PRINTINGS & UPDATES
 					System.out.println(this.getName() + " loaded packes at " + this.destination.getName());
+					int b_id = destination.getBranchId();
 					this.destination = this.getBelongTo();
-					this.setTimeLeft(new Random().nextInt(6)+1);
+					this.setTimeLeft((new Random().nextInt(6)+1)*10);
+					this.setTripToHub(b_id); 	//Calculate the new speed and cords trip to hub
 					System.out.println(this.getName() + " is on it's way to the " + this.destination.getName() + 
 							", time to arrive:" + this.getTimeLeft());
 				}
@@ -209,9 +228,12 @@ public class StandardTruck extends Truck{
 	{
 		if(this.isCanFit(p) && !(this.getPackages().contains(p)))
 		{
+			if(this.getPackages().size()==0)
+				setTruckColor(loadedColor);
 			this.getPackages().add(p);
 			this.loadedWeight += ((p instanceof SmallPackage) ? 1 : ((StandardPackage)p).getWeight());
 		}
+
 	}
 	
 	/**
@@ -227,14 +249,45 @@ public class StandardTruck extends Truck{
 				loadedWeight -=1;
 			else if (p instanceof StandardPackage)
 				loadedWeight -= ((StandardPackage) p).getWeight();
+			if(this.getPackages().size() == 0)
+				setTruckColor(Color.green);
 		}
 		else
 			System.out.println("The StnadardTruck don't contain any packages");
 	}
 	
-	
+	/**
+	 * Waking up the branch, and sets working attribute to true
+	 */
+	public void hubCallBack()
+	{
+		this.getBelongTo().wakeUp();
+		this.getBelongTo().setWorking(true);
+	}
+
 	@Override
 	public String getName() {
 		return "StandardTruck " + super.getTruckID();
+	}
+	
+	@Override
+	public void run() {
+		while(true)
+		{
+			while(Simulator.isSuspended())
+			{
+				try {					
+					synchronized (this) {wait();}	
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			this.work();
+			try {
+				Thread.sleep(500);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}			
+		}
 	}
 }

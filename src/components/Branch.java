@@ -1,18 +1,25 @@
 package components;
+import java.awt.Color;
 import java.util.ArrayList;
+
+import gui.Simulator;
 /**
  * Represents a local branch
- * @version 1.0, 9/4/2021
+ * @version 2.0, 8/5/2021
  * @author Itzik Rahamim - 312202351
  * @author Gil Ben Hamo - 315744557
  */
-public class Branch implements Node {
+public class Branch implements Runnable,Node {
 	private static int serialBranchID = -1;	//CONSISTENTS NUMBER FOR branchId
 	
 	private int branchId;
 	private String branchName;
 	private ArrayList<Truck> listTrucks;
 	private ArrayList<Package> listPackages;
+
+	private int x_cord, y_cord;
+	private Color branch_color;
+	private boolean working = false;
 	
 	/**
 	 * Constructs and initializes a NonStandardTruck by default
@@ -20,12 +27,28 @@ public class Branch implements Node {
 	public Branch()
 	{
 		this.branchId = serialBranchID++;
-		this.branchName = "Branch " + String.format("%d", branchId);
+		this.branchName = "branch " + String.format("%d", branchId);
 		this.listTrucks = new ArrayList<Truck>();
 		this.listPackages = new ArrayList<Package>();
 		System.out.println("Creating " + this.toString());
+		branch_color = Color.CYAN;
 	}
 	
+	/**
+	 * @return Branch color
+	 */
+	public Color getBranch_color() {
+		return branch_color;
+	}
+
+	/**
+	 * Sets new branch color
+	 * @param branch_color Branch color
+	 */
+	public void setBranch_color(Color branch_color) {
+		this.branch_color = branch_color;
+	}
+
 	/**
 	 * Constructs and initializes a NonStandardTruck with a value<br>
 	 * Example: Branch("SCE")
@@ -44,6 +67,37 @@ public class Branch implements Node {
 		return "Branch " + branchId + ", branch name: " + branchName + ", packages: " 
 				+ listPackages.size() + ", trucks: " + listTrucks.size();
 	}
+	
+	/**
+	 * @return X-Coordinate
+	 */
+	public int getX_cord() {
+		return x_cord;
+	}
+
+	/**
+	 * @return Y-Coordinate
+	 */
+	public int getY_cord() {
+		return y_cord;
+	}
+
+	/**
+	 * Sets new X-Coordinate
+	 * @param x_cord X-Coordinate
+	 */
+	public void setX_cord(int x_cord) {
+		this.x_cord = x_cord;
+	}
+
+	/**
+	 * Sets new Y-Coordinate
+	 * @param y_cord Y-Coordinate
+	 */
+	public void setY_cord(int y_cord) {
+		this.y_cord = y_cord;
+	}
+
 	
 	/**
 	 * Get the branch id
@@ -132,7 +186,15 @@ public class Branch implements Node {
 	@Override
 	public void collectPackage(Package p) {
 		if(!(this.listPackages.contains(p)))
-			this.listPackages.add(p);	
+		{
+			this.listPackages.add(p);
+			branch_color = Color.BLUE;
+		}
+		if(p.getStatus().equals(Status.COLLECTION) || p.getStatus().equals(Status.DELIVERY))
+		{
+			this.wakeUp();
+			this.setWorking(true);	
+		}
 	}
 	
 	/**
@@ -145,6 +207,10 @@ public class Branch implements Node {
 			listPackages.remove(p);
 		else
 			System.out.println("This branch do not contains this package");
+		if(listPackages.size()==0)
+		{
+			branch_color = Color.CYAN;
+		}
 	}
 	
 	/**
@@ -158,30 +224,41 @@ public class Branch implements Node {
 	public void work() {
 		ArrayList<Package> temp = new ArrayList<Package>(listPackages);
 		for(Package p : temp)
-		{//FOR ALL PACKAGES
+		{
+			//FOR ALL PACKAGES
 			if(p.getStatus().equals(Status.COLLECTION))
-			{	//Package is ready to collect
+			{	
+				//Package is ready to collect
 				Truck t = getAvailableTruck();
 				if(t != null) 
-				{//Got an available truck
+				{
+					//Got an available truck
 					handlePackage(p, this, t, Status.COLLECTION);
-					t.setTimeLeft(p.getSenderAddress().getStreet()%10 + 1);
+					t.setTimeLeft((p.getSenderAddress().getStreet()%10 + 1)*10);
 					t.setAvailable(false);
+					setCollectCords(p, t);
 					System.out.println(t.getName() + " is collecting package " + p.getPackageID() + ", time to arrive: " + t.getTimeLeft());
+					t.wakeUp();
 				}
 			}
 			else if(p.getStatus().equals(Status.DELIVERY))
-			{	//Package is ready to deliver
+			{	
+				//Package is ready to deliver
 				Truck t = getAvailableTruck();
 				if(t != null) 
-				{//Got an available truck
+				{
+					//Got an available truck
 					handlePackage(p, this, t, Status.DISTRIBUTION);
-					t.setTimeLeft(p.getDestinationAddress().getStreet()%10 + 1);
+					t.setTimeLeft((p.getDestinationAddress().getStreet()%10 + 1)*10);
 					t.setAvailable(false);
+					setDeliverCords(p,t);
 					System.out.println(t.getName() + " is delivering package " + p.getPackageID() + ", time left: " + t.getTimeLeft());
+					t.wakeUp();
 				}
 			}	
 		}
+		if(!needToWork())
+			this.working=false;
 	}
 	
 	@Override
@@ -217,7 +294,6 @@ public class Branch implements Node {
 		return true;
 	}
 	
-	//ADDITIONAL
 	/**
 	 * Search for an available truck
 	 * <br>If found return Truck, else return <b>null</b>
@@ -242,5 +318,120 @@ public class Branch implements Node {
 			this.listTrucks.add(truck);
 			truck.setBelongTo(this);
 		}
+	}
+	
+	/**
+	 * @return Center X-Coordinate of the branch
+	 */
+	public int getCenterX()
+	{
+		return x_cord+20; 
+	}
+	
+	/**
+	 * @return Bottom Y-Coordinate of the branch
+	 */
+	public int getBottomY()
+	{
+		return y_cord+30;
+	}
+	
+	/**
+	 * @return Left-Center X-Coordinate of the branch
+	 */
+	public int getEnterX()
+	{
+		return x_cord+40; 
+	}
+	
+	/**
+	 * @return Left-Center Y-Coordinate of the branch
+	 */
+	public int getEnterY()
+	{
+		return y_cord+15;
+	}
+	
+	@Override
+	public void run() {
+		while(true)
+		{
+			while(Simulator.isSuspended() || !working )
+			{
+				try {
+					synchronized(this){wait();}
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			this.work();
+			try {
+				Thread.sleep(500);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	/**
+	 * Sets new coordinates for collection from source
+	 * @param p Package
+	 * @param t Truck
+	 */
+	private void setCollectCords(Package p, Truck t)
+	{
+		t.setX_cord(this.getCenterX()-16);
+		t.setY_cord(this.getY_cord());
+		t.setX_speed((p.getCenterX()-16- t.getX_cord())/t.getTimeLeft());//-8
+		t.setY_speed((Package.getCollectY()-t.getY_cord())/t.getTimeLeft());
+	}
+	
+	/**
+	 * Sets new coordinates for deliver to destination
+	 * @param p Package
+	 * @param t Truck
+	 */
+	private void setDeliverCords(Package p, Truck t)
+	{
+		t.setX_cord(this.getCenterX()-16);
+		t.setY_cord(this.getBottomY());
+		t.setX_speed((p.getCenterX()-16- t.getX_cord())/t.getTimeLeft());//-8
+		t.setY_speed((Package.getEndY()-t.getY_cord())/t.getTimeLeft());
+	}
+	
+	/**
+	 * Lets the branch start work
+	 */
+	public synchronized void wakeUp()
+	{
+		notify();
+	}
+
+	/**
+	 * Check if branch is working right now
+	 * @return true if branch is working
+	 */
+	public boolean isWorking() {
+		return working;
+	}
+
+	/**
+	 * Sets branch working True/False
+	 * @param working is the branch working
+	 */
+	public void setWorking(boolean working) {
+		this.working = working;
+	}
+	
+	/**
+	 * Check if branch is need to work
+	 * @return True if branch needs to work
+	 */
+	public boolean needToWork()
+	{
+		for(Package p: listPackages)
+			if(p.getStatus().equals(Status.COLLECTION) || p.getStatus().equals(Status.DELIVERY))
+					return true;
+		return false;
 	}
 }
